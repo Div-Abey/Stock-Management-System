@@ -22,8 +22,7 @@ public class ItemDAO {
     }
 
     public boolean addUnit(String unitName, boolean isBaseUnit) {
-        String sql = "INSERT INTO units(unit_name, is_base_unit) VALUES(?, ?)";
-        try (Connection conn = DatabaseConnection.getConnection();
+        String sql = "INSERT OR IGNORE INTO units(unit_name, is_base_unit) VALUES(?, ?)";        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, unitName);
             pstmt.setInt(2, isBaseUnit ? 1 : 0);
@@ -37,7 +36,7 @@ public class ItemDAO {
     public boolean addItem(String itemCode, String barcode, String itemName,
                            int categoryId, int baseUnitId, int reorderLevel,
                            double retailPrice, double wholesalePrice) {
-        String sql = "INSERT INTO items(item_code, barcode, item_name, category_id, base_unit_id, " +
+        String sql = "INSERT OR IGNORE INTO items(item_code, barcode, item_name, category_id, base_unit_id, " +
                 "reorder_level, retail_price, wholesale_price) VALUES(?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
