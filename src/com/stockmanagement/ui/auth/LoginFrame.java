@@ -1,5 +1,6 @@
 package com.stockmanagement.ui.auth;
 
+import com.stockmanagement.security.dao.UserDAO;
 import com.stockmanagement.ui.dashboard.DashboardFrame;
 
 import javax.swing.*;
@@ -92,7 +93,7 @@ public class LoginFrame extends JFrame {
                 // Modified login logic to check for distinct roles
                 String username = (String) userRoleComboBox.getSelectedItem();
                 String password = new String(passwordField.getPassword());
-                
+
                 boolean isValidUser = false;
                 String role = "";
 
@@ -111,11 +112,17 @@ public class LoginFrame extends JFrame {
                 }
 
                 if (isValidUser) {
+
                     JOptionPane.showMessageDialog(LoginFrame.this, "Login successful as " + role);
+
                     new DashboardFrame().setVisible(true);
+
                     LoginFrame.this.setVisible(false);
+
                 } else {
+
                     JOptionPane.showMessageDialog(LoginFrame.this, "Invalid username or password");
+
                 }
             }
         });
