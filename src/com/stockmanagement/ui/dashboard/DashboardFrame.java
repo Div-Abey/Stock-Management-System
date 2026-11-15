@@ -22,22 +22,18 @@ public class DashboardFrame extends JFrame {
 
     private POSPanel posPanel;
 
-    // Default constructor
     public DashboardFrame() {
         this(1, "System Admin", "Admin");
     }
 
-    // Existing constructor (backward compatibility)
     public DashboardFrame(int userId, String userName) {
         this(userId, userName, "Admin");
     }
 
-    // Constructor for LoginFrame
     public DashboardFrame(String role) {
         this(1, role, role);
     }
 
-    // Main constructor
     public DashboardFrame(int userId, String userName, String role) {
 
         this.currentUserId = userId;
@@ -66,10 +62,7 @@ public class DashboardFrame extends JFrame {
         menuPanel.setBorder(
                 BorderFactory.createTitledBorder(
                         BorderFactory.createEtchedBorder(),
-                        "Menu",
-                        0,
-                        0,
-                        headerFont
+                        "Menu", 0, 0, headerFont
                 )
         );
 
@@ -85,30 +78,19 @@ public class DashboardFrame extends JFrame {
                 new Dimension(MENU_WIDTH, 0)
         );
 
-        // Add buttons according to user role
+        String[] menuItems = {
+                "Home",
+                "Sales",
+                "Inventory",
+                "Reports",
+                "Settings"
+        };
 
-        if (hasAccess("Home")) {
-            addMenuButton(menuPanel, "Home", labelFont);
-        }
+        for (String item : menuItems) {
 
-        if (hasAccess("Alerts")) {
-            addMenuButton(menuPanel, "Alerts", labelFont);
-        }
-
-        if (hasAccess("POS System")) {
-            addMenuButton(menuPanel, "POS System", labelFont);
-        }
-
-        if (hasAccess("Inventory")) {
-            addMenuButton(menuPanel, "Inventory", labelFont);
-        }
-
-        if (hasAccess("Reports")) {
-            addMenuButton(menuPanel, "Reports", labelFont);
-        }
-
-        if (hasAccess("Settings")) {
-            addMenuButton(menuPanel, "Settings", labelFont);
+            if (hasAccess(item)) {
+                addMenuButton(menuPanel, item, labelFont);
+            }
         }
 
         add(menuPanel, BorderLayout.WEST);
@@ -118,10 +100,7 @@ public class DashboardFrame extends JFrame {
         mainAreaPanel.setBorder(
                 BorderFactory.createTitledBorder(
                         BorderFactory.createEtchedBorder(),
-                        "Content Area",
-                        0,
-                        0,
-                        headerFont
+                        "Content Area", 0, 0, headerFont
                 )
         );
 
@@ -160,9 +139,12 @@ public class DashboardFrame extends JFrame {
 
     private boolean hasAccess(String menuName) {
 
-        String role = userRole.toLowerCase();
+        // Home is accessible to every role
+        if ("Home".equals(menuName)) {
+            return true;
+        }
 
-        switch (role) {
+        switch (userRole.toLowerCase()) {
 
             case "admin":
 
@@ -170,20 +152,17 @@ public class DashboardFrame extends JFrame {
 
             case "manager":
 
-                return menuName.equals("Home")
-                        || menuName.equals("Alerts")
-                        || menuName.equals("Inventory")
+                return menuName.equals("Inventory")
                         || menuName.equals("Reports")
                         || menuName.equals("Settings");
 
             case "store keeper":
 
-                return menuName.equals("Alerts")
-                        || menuName.equals("Inventory");
+                return menuName.equals("Inventory");
 
             case "cashier":
 
-                return menuName.equals("POS System")
+                return menuName.equals("Sales")
                         || menuName.equals("Inventory");
 
             default:
@@ -194,7 +173,11 @@ public class DashboardFrame extends JFrame {
 
     // ---------------- Create Menu Buttons ----------------
 
-    private void addMenuButton(JPanel menuPanel, String item, Font labelFont) {
+    private void addMenuButton(
+            JPanel menuPanel,
+            String item,
+            Font labelFont
+    ) {
 
         JButton button = new JButton(item);
 
@@ -221,7 +204,6 @@ public class DashboardFrame extends JFrame {
 
     private void handleMenuClick(String menuName) {
 
-        // Check permission before opening a module
         if (!hasAccess(menuName)) {
 
             JOptionPane.showMessageDialog(
@@ -241,8 +223,8 @@ public class DashboardFrame extends JFrame {
 
         }
 
-        // POS System
-        else if ("POS System".equals(menuName)) {
+        // Sales
+        else if ("Sales".equals(menuName)) {
 
             if (posPanel == null) {
 
@@ -262,7 +244,7 @@ public class DashboardFrame extends JFrame {
 
         }
 
-        // Other modules
+        // Other Modules
         else {
 
             JOptionPane.showMessageDialog(
@@ -298,7 +280,7 @@ public class DashboardFrame extends JFrame {
                 BorderLayout.CENTER
         );
 
-        // Alerts
+        // Alerts section in dashboard content
         JPanel alertsPanel = new JPanel(new BorderLayout());
 
         alertsPanel.setBorder(
@@ -329,8 +311,9 @@ public class DashboardFrame extends JFrame {
         SimpleDateFormat timeFormat =
                 new SimpleDateFormat("HH:mm:ss");
 
-        Timer timer = new Timer(1000, e ->
-                timeLabel.setText(
+        Timer timer = new Timer(
+                1000,
+                e -> timeLabel.setText(
                         timeFormat.format(new Date())
                 )
         );
