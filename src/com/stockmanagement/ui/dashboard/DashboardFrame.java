@@ -1,6 +1,8 @@
 package com.stockmanagement.ui.dashboard;
 
 import com.stockmanagement.ui.sales.POSPanel;
+import com.stockmanagement.ui.settings.SettingsPanel;
+import com.stockmanagement.ui.auth.LoginFrame;
 
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
@@ -21,6 +23,7 @@ public class DashboardFrame extends JFrame {
     private final JPanel mainAreaPanel = new JPanel(cardLayout);
 
     private POSPanel posPanel;
+    private SettingsPanel settingsPanel;
 
     public DashboardFrame() {
         this(1, "System Admin", "Admin");
@@ -87,11 +90,14 @@ public class DashboardFrame extends JFrame {
         };
 
         for (String item : menuItems) {
-
             if (hasAccess(item)) {
                 addMenuButton(menuPanel, item, labelFont);
             }
         }
+
+        // Log Out button
+        menuPanel.add(Box.createVerticalGlue());
+        addMenuButton(menuPanel, "Log Out", labelFont);
 
         add(menuPanel, BorderLayout.WEST);
 
@@ -139,34 +145,28 @@ public class DashboardFrame extends JFrame {
 
     private boolean hasAccess(String menuName) {
 
-        // Home is accessible to every role
-        if ("Home".equals(menuName)) {
+        if ("Home".equals(menuName) || "Log Out".equals(menuName)) {
             return true;
         }
 
         switch (userRole.toLowerCase()) {
 
             case "admin":
-
                 return true;
 
             case "manager":
-
                 return menuName.equals("Inventory")
                         || menuName.equals("Reports")
                         || menuName.equals("Settings");
 
             case "store keeper":
-
                 return menuName.equals("Inventory");
 
             case "cashier":
-
                 return menuName.equals("Sales")
                         || menuName.equals("Inventory");
 
             default:
-
                 return false;
         }
     }
@@ -204,6 +204,11 @@ public class DashboardFrame extends JFrame {
 
     private void handleMenuClick(String menuName) {
 
+        if ("Log Out".equals(menuName)) {
+            handleLogout();
+            return;
+        }
+
         if (!hasAccess(menuName)) {
 
             JOptionPane.showMessageDialog(
@@ -218,9 +223,7 @@ public class DashboardFrame extends JFrame {
 
         // Home
         if ("Home".equals(menuName)) {
-
             cardLayout.show(mainAreaPanel, "MainDashboard");
-
         }
 
         // Sales
@@ -236,12 +239,29 @@ public class DashboardFrame extends JFrame {
                 mainAreaPanel.add(posPanel, "Sales");
 
             } else {
-
                 posPanel.refreshMasterData();
             }
 
             cardLayout.show(mainAreaPanel, "Sales");
+        }
 
+        // Settings
+        else if ("Settings".equals(menuName)) {
+
+            if (settingsPanel == null) {
+
+                settingsPanel = new SettingsPanel(userRole);
+
+                mainAreaPanel.add(
+                        settingsPanel,
+                        "Settings"
+                );
+            }
+
+            cardLayout.show(
+                    mainAreaPanel,
+                    "Settings"
+            );
         }
 
         // Other Modules
@@ -253,6 +273,24 @@ public class DashboardFrame extends JFrame {
                     menuName,
                     JOptionPane.INFORMATION_MESSAGE
             );
+        }
+    }
+
+    // ---------------- Log Out Handling ----------------
+
+    private void handleLogout() {
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to log out?",
+                "Confirm Log Out",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+        );
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            dispose();
+
+            new LoginFrame().setVisible(true);
         }
     }
 
