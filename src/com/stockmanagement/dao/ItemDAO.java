@@ -1,6 +1,6 @@
 package com.stockmanagement.dao;
 
-import com.stockmanagement.config.DatabaseConnection;
+import com.stockmanagement.database.DatabaseConnection;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -22,7 +22,8 @@ public class ItemDAO {
     }
 
     public boolean addUnit(String unitName, boolean isBaseUnit) {
-        String sql = "INSERT OR IGNORE INTO units(unit_name, is_base_unit) VALUES(?, ?)";        try (Connection conn = DatabaseConnection.getConnection();
+        String sql = "INSERT OR IGNORE INTO units(unit_name, is_base_unit) VALUES(?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, unitName);
             pstmt.setInt(2, isBaseUnit ? 1 : 0);
