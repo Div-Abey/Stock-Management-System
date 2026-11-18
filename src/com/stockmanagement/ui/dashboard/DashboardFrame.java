@@ -1,8 +1,10 @@
 package com.stockmanagement.ui.dashboard;
 
+import com.stockmanagement.ui.auth.LoginFrame;
+import com.stockmanagement.ui.components.AlertsPanel;
+import com.stockmanagement.ui.inventory.InventoryPanel;
 import com.stockmanagement.ui.sales.POSPanel;
 import com.stockmanagement.ui.settings.SettingsPanel;
-import com.stockmanagement.ui.auth.LoginFrame;
 
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
@@ -23,7 +25,9 @@ public class DashboardFrame extends JFrame {
     private final JPanel mainAreaPanel = new JPanel(cardLayout);
 
     private POSPanel posPanel;
+    private InventoryPanel inventoryPanel;
     private SettingsPanel settingsPanel;
+    private AlertsPanel homeAlertsPanel;
 
     public DashboardFrame() {
         this(1, "System Admin", "Admin");
@@ -95,7 +99,7 @@ public class DashboardFrame extends JFrame {
             }
         }
 
-        // Log Out button
+        // Log Out button pinned to the bottom of the sidebar
         menuPanel.add(Box.createVerticalGlue());
         addMenuButton(menuPanel, "Log Out", labelFont);
 
@@ -145,6 +149,7 @@ public class DashboardFrame extends JFrame {
 
     private boolean hasAccess(String menuName) {
 
+        // Home and Log Out are accessible to every role
         if ("Home".equals(menuName) || "Log Out".equals(menuName)) {
             return true;
         }
@@ -223,6 +228,11 @@ public class DashboardFrame extends JFrame {
 
         // Home
         if ("Home".equals(menuName)) {
+
+            if (homeAlertsPanel != null) {
+                homeAlertsPanel.refreshAlerts();
+            }
+
             cardLayout.show(mainAreaPanel, "MainDashboard");
         }
 
@@ -245,6 +255,26 @@ public class DashboardFrame extends JFrame {
             cardLayout.show(mainAreaPanel, "Sales");
         }
 
+        // Inventory: loads inside the content area. Items / Categories / Units / Stock
+        // are tabs inside InventoryPanel, so switching between them never opens a window.
+        else if ("Inventory".equals(menuName)) {
+
+            if (inventoryPanel == null) {
+
+                inventoryPanel = new InventoryPanel(
+                        currentUserId,
+                        userRole
+                );
+
+                mainAreaPanel.add(inventoryPanel, "Inventory");
+            }
+
+            cardLayout.show(mainAreaPanel, "Inventory");
+
+            // Items tab the first time, afterwards reloads the tab that was last used
+            inventoryPanel.refresh();
+        }
+
         // Settings
         else if ("Settings".equals(menuName)) {
 
@@ -264,7 +294,7 @@ public class DashboardFrame extends JFrame {
             );
         }
 
-        // Other Modules
+        // Other Modules (e.g. Reports)
         else {
 
             JOptionPane.showMessageDialog(
@@ -279,12 +309,13 @@ public class DashboardFrame extends JFrame {
     // ---------------- Log Out Handling ----------------
 
     private void handleLogout() {
+
         int confirm = JOptionPane.showConfirmDialog(
                 this,
                 "Are you sure you want to log out?",
                 "Confirm Log Out",
                 JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE
+                JOptionPane.INFORMATION_MESSAGE
         );
 
         if (confirm == JOptionPane.YES_OPTION) {
@@ -318,17 +349,8 @@ public class DashboardFrame extends JFrame {
                 BorderLayout.CENTER
         );
 
-        // Alerts section in dashboard content
-        JPanel alertsPanel = new JPanel(new BorderLayout());
-
-        alertsPanel.setBorder(
-                BorderFactory.createTitledBorder("Alerts")
-        );
-
-        alertsPanel.add(
-                new JLabel("Critical alerts here...", JLabel.CENTER),
-                BorderLayout.CENTER
-        );
+        // Alerts: low stock, expiring and expired batches (live from the database)
+        homeAlertsPanel = new AlertsPanel();
 
         // System Time
         JPanel timePanel = new JPanel(new BorderLayout());
@@ -349,6 +371,7 @@ public class DashboardFrame extends JFrame {
         SimpleDateFormat timeFormat =
                 new SimpleDateFormat("HH:mm:ss");
 
+        // javax.swing.Timer (java.util.Timer is not imported, so no ambiguity)
         Timer timer = new Timer(
                 1000,
                 e -> timeLabel.setText(
@@ -359,7 +382,7 @@ public class DashboardFrame extends JFrame {
         timer.start();
 
         dashboardPanel.add(dailyTasksPanel);
-        dashboardPanel.add(alertsPanel);
+        dashboardPanel.add(homeAlertsPanel);
         dashboardPanel.add(timePanel);
 
         return dashboardPanel;

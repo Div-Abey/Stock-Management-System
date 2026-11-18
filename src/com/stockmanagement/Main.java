@@ -4,6 +4,8 @@ import com.stockmanagement.database.DatabaseConnection;
 import com.stockmanagement.database.DatabaseInitializer;
 import com.stockmanagement.database.DatabaseMigrator;
 import com.stockmanagement.inventory.dao.ItemDAO;
+import com.stockmanagement.inventory.dao.UnitDAO;
+import com.stockmanagement.inventory.service.StockAlertService;
 import com.stockmanagement.security.dao.UserDAO;
 import com.stockmanagement.ui.auth.LoginFrame;
 
@@ -27,12 +29,13 @@ public class Main {
         itemDAO.addCategory("Beverages");
         itemDAO.addUnit("Piece", true);
         itemDAO.addUnit("Box", false);
+        seedInventoryUnits(itemDAO);
 
         itemDAO.addItem("ITM-001", "8901234567890", "Orange Juice 1L", 1, 1, 15, 350.00, 300.00);
         seedDemoStock();
 
-        // Step 3: Check Stock Alerts
-        itemDAO.listLowStockItems();
+        // Step 3: Check Stock Alerts (low stock / expiring / expired) - also shown on the Dashboard
+        printStockAlerts();
 
         // Step 4: Launch UI on Event Dispatch Thread (EDT)
         SwingUtilities.invokeLater(() -> {
@@ -91,6 +94,32 @@ public class Main {
             }
         } catch (SQLException e) {
             System.err.println("Error seeding demo stock: " + e.getMessage());
+        }
+    }
+
+    /** Starter units for the Inventory module + a sample bulk rule (1 Box = 12 Piece). Safe to run on every start. */
+    private static void seedInventoryUnits(ItemDAO itemDAO) {
+        itemDAO.addUnit("Carton", false);
+        itemDAO.addUnit("Packet", false);
+        itemDAO.addUnit("Kg", false);
+        itemDAO.addUnit("Gram", true);
+        try {
+            new UnitDAO().insertConversionIfMissing("Box", "Piece", 12);
+            new UnitDAO().insertConversionIfMissing("Kg", "Gram", 1000);
+        } catch (SQLException e) {
+            System.err.println("Error seeding unit conversions: " + e.getMessage());
+        }
+    }
+
+    private static void printStockAlerts() {
+        try {
+            StockAlertService.AlertSummary s = new StockAlertService().getSummary(StockAlertService.DEFAULT_EXPIRY_WARNING_DAYS);
+            System.out.println("--- STOCK ALERTS: " + s.lowStock.size() + " low stock, "
+                    + s.expiringSoon.size() + " expiring soon, " + s.expired.size() + " expired ---");
+            s.lowStock.forEach(i -> System.out.printf("Low stock: %s | Re-order level: %d | Current: %d%n",
+                    i.getItemName(), i.getReorderLevel(), i.getCurrentStock()));
+        } catch (SQLException e) {
+            System.err.println("Error checking stock alerts: " + e.getMessage());
         }
     }
 }
