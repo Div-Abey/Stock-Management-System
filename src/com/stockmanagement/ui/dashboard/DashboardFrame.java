@@ -2,8 +2,9 @@ package com.stockmanagement.ui.dashboard;
 
 import com.stockmanagement.ui.auth.LoginFrame;
 import com.stockmanagement.ui.components.AlertsPanel;
+import com.stockmanagement.ui.components.GreetingClockPanel;
+import com.stockmanagement.ui.components.SalesSummaryPanel;
 import com.stockmanagement.ui.inventory.InventoryPanel;
-import com.stockmanagement.supplier.model.Cheque;
 import com.stockmanagement.supplier.service.ChequeService;
 import com.stockmanagement.ui.cheque.ChequePanel;
 import com.stockmanagement.ui.cheque.ChequeReminderDialog;
@@ -17,9 +18,6 @@ import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
 
 public class DashboardFrame extends JFrame {
 
@@ -39,10 +37,11 @@ public class DashboardFrame extends JFrame {
     private ReportsPanel reportsPanel;
 
     private final ChequeService chequeService = new ChequeService();
-    private final JTextArea alertsArea = new JTextArea();
     private InventoryPanel inventoryPanel;
     private SettingsPanel settingsPanel;
     private AlertsPanel homeAlertsPanel;
+    private SalesSummaryPanel todaySalesPanel;
+    private SalesSummaryPanel lastMonthSalesPanel;
 
     public DashboardFrame() {
         this(1, "System Admin", "Admin");
@@ -162,9 +161,7 @@ public class DashboardFrame extends JFrame {
 
         add(statusBar, BorderLayout.SOUTH);
 
-        // Cheque reminders: pop-up once per cheque after the window opens, and the Alerts box refreshes every 30 minutes
-        refreshAlerts();
-        new Timer(30 * 60 * 1000, e -> refreshAlerts()).start();
+        // Cheque reminders: pop-up once per cheque after the window opens (the Alerts box refreshes itself every minute)
         SwingUtilities.invokeLater(() -> {
             if (hasAccess("Cheques")) {
                 ChequeReminderDialog.showIfNeeded(this, chequeService);
@@ -267,6 +264,12 @@ public class DashboardFrame extends JFrame {
 
             if (homeAlertsPanel != null) {
                 homeAlertsPanel.refreshAlerts();
+            }
+            if (todaySalesPanel != null) {
+                todaySalesPanel.refresh();
+            }
+            if (lastMonthSalesPanel != null) {
+                lastMonthSalesPanel.refresh();
             }
 
             cardLayout.show(mainAreaPanel, "MainDashboard");
@@ -411,96 +414,37 @@ public class DashboardFrame extends JFrame {
 
     // ---------------- Main Dashboard Panel ----------------
 
+    /**
+     * Home page: greeting + live clock on top, Alerts (out of stock / low stock / expiry / cheques) on the left,
+     * today's sales and last month's sales on the right.
+     */
     private JPanel createMainDashboardPanel(Font labelFont) {
 
-        JPanel dashboardPanel = new JPanel(
-                new GridLayout(1, 3, 10, 10)
-        );
+        JPanel dashboardPanel = new JPanel(new BorderLayout(10, 10));
 
         dashboardPanel.setBorder(
                 BorderFactory.createEmptyBorder(10, 10, 10, 10)
         );
 
-        // Daily Tasks
-        JPanel dailyTasksPanel = new JPanel(new BorderLayout());
-
-        dailyTasksPanel.setBorder(
-                BorderFactory.createTitledBorder("Daily Tasks")
+        dashboardPanel.add(
+                new GreetingClockPanel(currentUserName),
+                BorderLayout.NORTH
         );
 
-        dailyTasksPanel.add(
-                new JLabel("Task list here...", JLabel.CENTER),
-                BorderLayout.CENTER
-        );
-
-        // Alerts: low stock, expiring and expired batches (live from the database)
         homeAlertsPanel = new AlertsPanel();
-        // Alerts section in dashboard content
-        JPanel alertsPanel = new JPanel(new BorderLayout());
+        todaySalesPanel = new SalesSummaryPanel(SalesSummaryPanel.Period.TODAY);
+        lastMonthSalesPanel = new SalesSummaryPanel(SalesSummaryPanel.Period.LAST_MONTH);
 
-        alertsPanel.setBorder(
-                BorderFactory.createTitledBorder("Alerts")
-        );
+        JPanel salesColumn = new JPanel(new GridLayout(2, 1, 10, 10));
+        salesColumn.add(todaySalesPanel);
+        salesColumn.add(lastMonthSalesPanel);
 
-        alertsArea.setEditable(false);
-        alertsArea.setLineWrap(true);
-        alertsArea.setWrapStyleWord(true);
-        alertsArea.setOpaque(false);
-        alertsPanel.add(new JScrollPane(alertsArea), BorderLayout.CENTER);
+        JPanel body = new JPanel(new GridLayout(1, 2, 10, 10));
+        body.add(homeAlertsPanel);
+        body.add(salesColumn);
 
-        // System Time
-        JPanel timePanel = new JPanel(new BorderLayout());
-
-        timePanel.setBorder(
-                BorderFactory.createTitledBorder("System Time")
-        );
-
-        JLabel timeLabel = new JLabel("", JLabel.CENTER);
-
-        timeLabel.setFont(labelFont);
-
-        timePanel.add(
-                timeLabel,
-                BorderLayout.CENTER
-        );
-
-        SimpleDateFormat timeFormat =
-                new SimpleDateFormat("HH:mm:ss");
-
-        // javax.swing.Timer (java.util.Timer is not imported, so no ambiguity)
-        Timer timer = new Timer(
-                1000,
-                e -> timeLabel.setText(
-                        timeFormat.format(new Date())
-                )
-        );
-
-        timer.start();
-
-        dashboardPanel.add(dailyTasksPanel);
-        dashboardPanel.add(homeAlertsPanel);
-        dashboardPanel.add(timePanel);
+        dashboardPanel.add(body, BorderLayout.CENTER);
 
         return dashboardPanel;
-    }
-
-    // ---------------- Cheque alerts (3.3) ----------------
-
-    /** Fills the Alerts box with cheques that are due today / overdue and the ones due in the next 3 days. */
-    private void refreshAlerts() {
-        try {
-            StringBuilder sb = new StringBuilder();
-            List<Cheque> due = chequeService.getDueCheques();
-            for (Cheque c : due) {
-                sb.append("DUE: ").append(chequeService.describe(c)).append("\n\n");
-            }
-            for (Cheque c : chequeService.getUpcomingCheques(3)) {
-                sb.append("Soon: ").append(chequeService.describe(c)).append("\n\n");
-            }
-            alertsArea.setText(sb.length() == 0 ? "No cheque reminders." : sb.toString());
-            alertsArea.setCaretPosition(0);
-        } catch (java.sql.SQLException ex) {
-            alertsArea.setText("Could not load cheque reminders: " + ex.getMessage());
-        }
     }
 }
