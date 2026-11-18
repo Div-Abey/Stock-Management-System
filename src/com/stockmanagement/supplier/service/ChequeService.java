@@ -17,18 +17,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 3.3 Cheque management: record post-dated cheques, clear / bounce them and raise realization-date reminders. */
+
 public class ChequeService {
 
     private final ChequeDAO chequeDAO = new ChequeDAO();
     private final CustomerLedgerService ledgerService = new CustomerLedgerService();
+    private final AccountsPayableService payableService = new AccountsPayableService();
 
 
-    /**
-     * Records a cheque (number, bank, amount, date). RECEIVED needs a customer, ISSUED needs a supplier.
-     * This only records the cheque; payments made through the Customer Ledger / Accounts Payable screens
-     * record their cheque automatically.
-     */
     public void recordCheque(ChequeType type, Integer customerId, Integer supplierId, String number, String bank,
                              double amount, LocalDate issueDate, LocalDate realizationDate) throws SQLException {
         ValidationUtil.requireText(number, "Cheque number");
@@ -57,19 +53,19 @@ public class ChequeService {
         changeStatus(chequeId, ChequeStatus.CLEARED);
     }
 
-    /** Entered by mistake: only the cheque record is cancelled, balances are not changed. */
     public void cancel(int chequeId) throws SQLException {
         changeStatus(chequeId, ChequeStatus.CANCELLED);
     }
 
-    /** Bounced: the customer owes the amount again (received) or we owe the supplier again (issued). */
     public void markBounced(int chequeId) throws SQLException {
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
                 Cheque c = requirePending(conn, chequeId);
                 chequeDAO.updateStatus(conn, chequeId, ChequeStatus.BOUNCED);
-
+                if (c.getChequeType() == ChequeType.RECEIVED && c.getCustomerId() != null) {
+                    ledgerService.reversePayment(conn, c.getCustomerId(), c.getAmount());
+                }
                 conn.commit();
             } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
@@ -78,12 +74,11 @@ public class ChequeService {
         }
     }
 
-    /** Pending cheques whose realization date is today or already passed. */
     public List<Cheque> getDueCheques() throws SQLException {
         return chequeDAO.findPendingUpTo(LocalDate.now());
     }
 
-    /** Pending cheques that are due within the next few days (not yet today). */
+
     public List<Cheque> getUpcomingCheques(int days) throws SQLException {
         List<Cheque> list = new ArrayList<>();
         LocalDate today = LocalDate.now();
@@ -95,10 +90,6 @@ public class ChequeService {
         return list;
     }
 
-    /**
-     * Cheques that need a NEW reminder (due, and no reminder shown before). They are marked as reminded and a
-     * notification_logs row is written, so each cheque pops up once; the dashboard alert list keeps showing it.
-     */
     public List<Cheque> collectNewReminders() throws SQLException {
         List<Cheque> fresh = new ArrayList<>();
         try (Connection conn = DatabaseConnection.getConnection()) {
