@@ -47,7 +47,7 @@ public class StockService {
                 StockBatch batch = receiveStock(conn, r);
                 conn.commit();
                 return batch;
-            } catch (ValidationException | SQLException | RuntimeException e) {
+            } catch (SQLException | RuntimeException e) {
                 conn.rollback();
                 throw e;
             }
@@ -111,7 +111,7 @@ public class StockService {
                 batchDAO.setRemaining(conn, batchId, newRemaining);
                 movementDAO.insert(conn, b.getItemId(), batchId, StockMovementType.ADJUSTMENT, change, null, reason.trim(), userId);
                 conn.commit();
-            } catch (ValidationException | SQLException | RuntimeException e) {
+            } catch (SQLException | RuntimeException e) {
                 conn.rollback();
                 throw e;
             }

@@ -15,12 +15,12 @@ public final class DateUtil {
     public static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     public static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private DateUtil() {
-    }
     private DateUtil() { }
 
     public static boolean isNoExpiry(String isoDate) {
         return NO_EXPIRY_DATE.equals(isoDate);
+    }
+
     public static String format(LocalDate date) {
         return date == null ? "" : date.format(DATE);
     }
@@ -29,7 +29,6 @@ public final class DateUtil {
         return isNoExpiry(isoDate) ? "No expiry" : isoDate;
     }
 
-    public static LocalDate parse(String isoDate) {
     public static LocalDate parse(String text) {
         if (text == null || text.trim().isEmpty()) {
             throw new ValidationException("Enter a date as yyyy-MM-dd (for example 2026-12-31).");
@@ -48,8 +47,6 @@ public final class DateUtil {
         try {
             return LocalDate.parse(stored.substring(0, 10), DATE);
         } catch (DateTimeParseException ex) {
-            return LocalDate.parse(isoDate);
-        } catch (DateTimeParseException | NullPointerException e) {
             return null;
         }
     }
