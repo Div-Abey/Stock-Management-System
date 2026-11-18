@@ -148,8 +148,6 @@ public class POSPanel extends JPanel {
         qtyBox.add(spnQuantity);
 
         JButton btnAddCart = new JButton("Add to Cart");
-        btnAddCart.setBackground(new Color(37, 99, 235));
-        btnAddCart.setForeground(Color.WHITE);
         btnAddCart.addActionListener(e -> handleAddSelectedItem());
         qtyBox.add(btnAddCart);
 
@@ -165,7 +163,6 @@ public class POSPanel extends JPanel {
         row2.add(qtyBox, d);
 
         JLabel lblBulkOffer = new JLabel("Offer: " + DiscountService.describeDefaultRule());
-        lblBulkOffer.setForeground(new Color(22, 163, 74));
         lblBulkOffer.setFont(new Font("SansSerif", Font.BOLD, 12));
         d.gridy = 1;
         d.gridx = 0;
@@ -222,19 +219,15 @@ public class POSPanel extends JPanel {
 
         lblTotalDiscount = new JLabel("Discount: Rs. 0.00");
         lblTotalDiscount.setFont(new Font("SansSerif", Font.BOLD, 14));
-        lblTotalDiscount.setForeground(new Color(22, 163, 74));
 
         lblNetPayable = new JLabel("Net Payable: Rs. 0.00");
         lblNetPayable.setFont(new Font("SansSerif", Font.BOLD, 17));
-        lblNetPayable.setForeground(new Color(15, 23, 42));
 
         totalsPanel.add(lblGrossTotal);
         totalsPanel.add(lblTotalDiscount);
         totalsPanel.add(lblNetPayable);
 
-        JButton btnProceedBilling = new JButton("Proceed to Checkout  ->");
-        btnProceedBilling.setBackground(new Color(22, 163, 74));
-        btnProceedBilling.setForeground(Color.WHITE);
+        JButton btnProceedBilling = new JButton("Proceed to Checkout");
         btnProceedBilling.setFont(new Font("SansSerif", Font.BOLD, 15));
         btnProceedBilling.setPreferredSize(new Dimension(215, 42));
         btnProceedBilling.addActionListener(e -> openBillingCheckout());

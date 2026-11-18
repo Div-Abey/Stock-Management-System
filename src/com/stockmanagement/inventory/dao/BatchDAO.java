@@ -14,6 +14,10 @@ import java.util.List;
 /** This code manages stock batches. It allows multiple operations to run together using one database connection. */
 public class BatchDAO {
 
+    public int insertBatch(Connection conn, int itemId, String trim, String trim1, int quantity, double purchasePrice) {
+        return itemId;
+    }
+
     public static class SellableBatch {
         private final int batchId;
         private final String batchNumber;

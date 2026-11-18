@@ -83,13 +83,11 @@ public class BillingFrame extends JFrame {
 
         summary.add(new JLabel("Bulk Discount:"));
         JLabel lblDisc = new JLabel(String.format("-Rs. %.2f", draftSale.getDiscountAmount()));
-        lblDisc.setForeground(new Color(22, 163, 74));
         summary.add(lblDisc);
 
         summary.add(new JLabel("NET PAYABLE:"));
         JLabel lblNet = new JLabel(String.format("Rs. %.2f", draftSale.getNetAmount()));
         lblNet.setFont(new Font("SansSerif", Font.BOLD, 16));
-        lblNet.setForeground(new Color(30, 58, 138));
         summary.add(lblNet);
 
         return summary;
@@ -128,7 +126,6 @@ public class BillingFrame extends JFrame {
 
         lblBalance = new JLabel("Change / Balance: Rs. 0.00");
         lblBalance.setFont(new Font("SansSerif", Font.BOLD, 14));
-        lblBalance.setForeground(new Color(22, 163, 74));
         lblBalance.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         // Credit Sub-Panel
@@ -183,8 +180,6 @@ public class BillingFrame extends JFrame {
         btnCancel.addActionListener(e -> dispose());
 
         JButton btnConfirm = new JButton("Confirm & Generate Invoice");
-        btnConfirm.setBackground(new Color(22, 163, 74));
-        btnConfirm.setForeground(Color.WHITE);
         btnConfirm.setFont(new Font("SansSerif", Font.BOLD, 13));
         btnConfirm.addActionListener(e -> processCheckout());
 
@@ -281,4 +276,4 @@ public class BillingFrame extends JFrame {
                     "Transaction Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-}
+}

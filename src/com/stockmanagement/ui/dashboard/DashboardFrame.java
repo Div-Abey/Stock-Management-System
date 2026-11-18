@@ -3,7 +3,13 @@ package com.stockmanagement.ui.dashboard;
 import com.stockmanagement.ui.auth.LoginFrame;
 import com.stockmanagement.ui.components.AlertsPanel;
 import com.stockmanagement.ui.inventory.InventoryPanel;
+import com.stockmanagement.supplier.model.Cheque;
+import com.stockmanagement.supplier.service.ChequeService;
+import com.stockmanagement.ui.cheque.ChequePanel;
+import com.stockmanagement.ui.cheque.ChequeReminderDialog;
+import com.stockmanagement.ui.customer.CustomerModulePanel;
 import com.stockmanagement.ui.sales.POSPanel;
+import com.stockmanagement.ui.supplier.SupplierManagementPanel;
 import com.stockmanagement.ui.settings.SettingsPanel;
 
 import javax.swing.*;
@@ -12,6 +18,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 
 public class DashboardFrame extends JFrame {
 
@@ -25,6 +32,12 @@ public class DashboardFrame extends JFrame {
     private final JPanel mainAreaPanel = new JPanel(cardLayout);
 
     private POSPanel posPanel;
+    private CustomerModulePanel customerPanel;
+    private SupplierManagementPanel supplierPanel;
+    private ChequePanel chequePanel;
+
+    private final ChequeService chequeService = new ChequeService();
+    private final JTextArea alertsArea = new JTextArea();
     private InventoryPanel inventoryPanel;
     private SettingsPanel settingsPanel;
     private AlertsPanel homeAlertsPanel;
@@ -88,6 +101,9 @@ public class DashboardFrame extends JFrame {
         String[] menuItems = {
                 "Home",
                 "Sales",
+                "Customers",
+                "Suppliers",
+                "Cheques",
                 "Inventory",
                 "Reports",
                 "Settings"
@@ -143,6 +159,15 @@ public class DashboardFrame extends JFrame {
         statusBar.add(statusLabel, BorderLayout.WEST);
 
         add(statusBar, BorderLayout.SOUTH);
+
+        // Cheque reminders: pop-up once per cheque after the window opens, and the Alerts box refreshes every 30 minutes
+        refreshAlerts();
+        new Timer(30 * 60 * 1000, e -> refreshAlerts()).start();
+        SwingUtilities.invokeLater(() -> {
+            if (hasAccess("Cheques")) {
+                ChequeReminderDialog.showIfNeeded(this, chequeService);
+            }
+        });
     }
 
     // ---------------- Role Permissions ----------------
@@ -160,15 +185,20 @@ public class DashboardFrame extends JFrame {
                 return true;
 
             case "manager":
-                return menuName.equals("Inventory")
+                return menuName.equals("Customers")
+                        || menuName.equals("Suppliers")
+                        || menuName.equals("Cheques")
+                        || menuName.equals("Inventory")
                         || menuName.equals("Reports")
                         || menuName.equals("Settings");
 
             case "store keeper":
-                return menuName.equals("Inventory");
+                return menuName.equals("Suppliers")
+                        || menuName.equals("Inventory");
 
             case "cashier":
                 return menuName.equals("Sales")
+                        || menuName.equals("Customers")
                         || menuName.equals("Inventory");
 
             default:
@@ -294,6 +324,43 @@ public class DashboardFrame extends JFrame {
             );
         }
 
+        // Customers (3.1): accounts + ledger / statements
+        else if ("Customers".equals(menuName)) {
+
+            if (customerPanel == null) {
+                customerPanel = new CustomerModulePanel();
+                mainAreaPanel.add(customerPanel, "Customers");
+            } else {
+                customerPanel.refresh();
+            }
+            cardLayout.show(mainAreaPanel, "Customers");
+        }
+
+        // Suppliers (3.2): suppliers, payables, purchase orders, GRN
+        else if ("Suppliers".equals(menuName)) {
+
+            if (supplierPanel == null) {
+                supplierPanel = new SupplierManagementPanel(currentUserId);
+                mainAreaPanel.add(supplierPanel, "Suppliers");
+            } else {
+                supplierPanel.refresh();
+            }
+            cardLayout.show(mainAreaPanel, "Suppliers");
+        }
+
+        // Cheques (3.3)
+        else if ("Cheques".equals(menuName)) {
+
+            if (chequePanel == null) {
+                chequePanel = new ChequePanel();
+                mainAreaPanel.add(chequePanel, "Cheques");
+            } else {
+                chequePanel.refresh();
+            }
+            cardLayout.show(mainAreaPanel, "Cheques");
+        }
+
+        // Other Modules
         // Other Modules (e.g. Reports)
         else {
 
@@ -351,6 +418,18 @@ public class DashboardFrame extends JFrame {
 
         // Alerts: low stock, expiring and expired batches (live from the database)
         homeAlertsPanel = new AlertsPanel();
+        // Alerts section in dashboard content
+        JPanel alertsPanel = new JPanel(new BorderLayout());
+
+        alertsPanel.setBorder(
+                BorderFactory.createTitledBorder("Alerts")
+        );
+
+        alertsArea.setEditable(false);
+        alertsArea.setLineWrap(true);
+        alertsArea.setWrapStyleWord(true);
+        alertsArea.setOpaque(false);
+        alertsPanel.add(new JScrollPane(alertsArea), BorderLayout.CENTER);
 
         // System Time
         JPanel timePanel = new JPanel(new BorderLayout());
@@ -386,5 +465,25 @@ public class DashboardFrame extends JFrame {
         dashboardPanel.add(timePanel);
 
         return dashboardPanel;
+    }
+
+    // ---------------- Cheque alerts (3.3) ----------------
+
+    /** Fills the Alerts box with cheques that are due today / overdue and the ones due in the next 3 days. */
+    private void refreshAlerts() {
+        try {
+            StringBuilder sb = new StringBuilder();
+            List<Cheque> due = chequeService.getDueCheques();
+            for (Cheque c : due) {
+                sb.append("DUE: ").append(chequeService.describe(c)).append("\n\n");
+            }
+            for (Cheque c : chequeService.getUpcomingCheques(3)) {
+                sb.append("Soon: ").append(chequeService.describe(c)).append("\n\n");
+            }
+            alertsArea.setText(sb.length() == 0 ? "No cheque reminders." : sb.toString());
+            alertsArea.setCaretPosition(0);
+        } catch (java.sql.SQLException ex) {
+            alertsArea.setText("Could not load cheque reminders: " + ex.getMessage());
+        }
     }
 }
