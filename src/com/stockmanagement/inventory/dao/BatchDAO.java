@@ -10,6 +10,10 @@ import java.util.List;
 /** SQL for stock batches. Methods take a Connection so a sale can run in ONE database transaction. */
 public class BatchDAO {
 
+    public int insertBatch(Connection conn, int itemId, String trim, String trim1, int quantity, double purchasePrice) {
+        return itemId;
+    }
+
     public static class SellableBatch {
         private final int batchId;
         private final String batchNumber;
