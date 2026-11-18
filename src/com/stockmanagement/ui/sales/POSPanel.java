@@ -26,6 +26,7 @@ public class POSPanel extends JPanel {
 
     private JComboBox<CustomerSummary> cmbCustomers;
     private JTextField txtBarcodeScan;
+    private JLabel lblScanInfo;
     private JComboBox<ItemStockSummary> cmbItems;
     private JSpinner spnQuantity;
     private DefaultTableModel cartTableModel;
@@ -93,6 +94,12 @@ public class POSPanel extends JPanel {
         txtBarcodeScan.setPreferredSize(new Dimension(170, 28));
         txtBarcodeScan.setMinimumSize(new Dimension(100, 28));
         txtBarcodeScan.addActionListener(e -> handleBarcodeScan());
+        // show the item's details + price as soon as a matching code / barcode is entered (before it is added)
+        txtBarcodeScan.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { showScannedItemDetails(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { showScannedItemDetails(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { showScannedItemDetails(); }
+        });
         c.gridx = 1;
         c.weightx = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
@@ -103,6 +110,16 @@ public class POSPanel extends JPanel {
         c.gridx = 2;
         c.weightx = 0;
         row1.add(btnQuickScan, c);
+
+        lblScanInfo = new JLabel(" ");
+        lblScanInfo.setFont(new Font("SansSerif", Font.BOLD, 13));
+        c.gridy = 2;
+        c.gridx = 1;
+        c.gridwidth = 2;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        row1.add(lblScanInfo, c);
+        c.gridwidth = 1;
 
         // Block 2: product, quantity and the add / refresh buttons
         JPanel row2 = new JPanel(new GridBagLayout());
@@ -241,6 +258,28 @@ public class POSPanel extends JPanel {
         } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this, "Error loading POS items/customers: " + ex.getMessage(),
                     "Database Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Live lookup while the cashier types/scans: shows name, price, unit and stock of an exactly matching code or barcode. */
+    private void showScannedItemDetails() {
+        String code = txtBarcodeScan.getText().trim();
+        if (code.isEmpty()) {
+            lblScanInfo.setText(" ");
+            return;
+        }
+        try {
+            ItemStockSummary item = salesService.findItemByCodeOrBarcode(code);
+            if (item == null) {
+                lblScanInfo.setText(" ");
+            } else if (item.getAvailableStock() <= 0) {
+                lblScanInfo.setText(item.getItemCode() + " - " + item.getItemName() + "  |  OUT OF STOCK");
+            } else {
+                lblScanInfo.setText(String.format("%s - %s  |  Rs. %.2f per %s  |  In stock: %d",
+                        item.getItemCode(), item.getItemName(), item.getRetailPrice(), item.getBaseUnitName(), item.getAvailableStock()));
+            }
+        } catch (SQLException ex) {
+            lblScanInfo.setText(" ");
         }
     }
 
