@@ -8,6 +8,7 @@ import com.stockmanagement.supplier.service.ChequeService;
 import com.stockmanagement.ui.cheque.ChequePanel;
 import com.stockmanagement.ui.cheque.ChequeReminderDialog;
 import com.stockmanagement.ui.customer.CustomerModulePanel;
+import com.stockmanagement.ui.reports.ReportsPanel;
 import com.stockmanagement.ui.sales.POSPanel;
 import com.stockmanagement.ui.supplier.SupplierManagementPanel;
 import com.stockmanagement.ui.settings.SettingsPanel;
@@ -35,6 +36,7 @@ public class DashboardFrame extends JFrame {
     private CustomerModulePanel customerPanel;
     private SupplierManagementPanel supplierPanel;
     private ChequePanel chequePanel;
+    private ReportsPanel reportsPanel;
 
     private final ChequeService chequeService = new ChequeService();
     private final JTextArea alertsArea = new JTextArea();
@@ -360,8 +362,19 @@ public class DashboardFrame extends JFrame {
             cardLayout.show(mainAreaPanel, "Cheques");
         }
 
+        // Reports: Sales / Stock / Profit & Loss / Aging tabs, CSV + PDF export
+        else if ("Reports".equals(menuName)) {
+
+            if (reportsPanel == null) {
+                reportsPanel = new ReportsPanel();
+                mainAreaPanel.add(reportsPanel, "Reports");
+            } else {
+                reportsPanel.refreshSelected();
+            }
+            cardLayout.show(mainAreaPanel, "Reports");
+        }
+
         // Other Modules
-        // Other Modules (e.g. Reports)
         else {
 
             JOptionPane.showMessageDialog(
