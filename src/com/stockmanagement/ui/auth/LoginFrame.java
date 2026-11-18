@@ -103,53 +103,57 @@ public class LoginFrame extends JFrame {
             public void actionPerformed(ActionEvent e) {
 
                 // Login logic
-                String username = (String) userRoleComboBox.getSelectedItem();
-                String password = new String(passwordField.getPassword());
+                loginButton.addActionListener(ea -> {
 
-                boolean isValidUser = false;
-                String role = "";
+                    String role = (String) userRoleComboBox.getSelectedItem();
 
-                if ("Admin".equals(username) && "admin123".equals(password)) {
-
-                    isValidUser = true;
-                    role = "Admin";
-
-                } else if ("Manager".equals(username) && "manager123".equals(password)) {
-
-                    isValidUser = true;
-                    role = "Manager";
-
-                } else if ("Cashier".equals(username) && "cashier123".equals(password)) {
-
-                    isValidUser = true;
-                    role = "Cashier";
-
-                } else if ("Store Keeper".equals(username) && "storekeeper123".equals(password)) {
-
-                    isValidUser = true;
-                    role = "Store Keeper";
-                }
-
-                if (isValidUser) {
-
-                    JOptionPane.showMessageDialog(
-                            LoginFrame.this,
-                            "Login successful as " + role
+                    String password = new String(
+                            passwordField.getPassword()
                     );
 
-                    // Pass selected role to Dashboard
-                    new DashboardFrame(role).setVisible(true);
+                    try {
 
-                    LoginFrame.this.setVisible(false);
+                        UserDAO userDAO = new UserDAO();
 
-                } else {
+                        UserDAO.UserRecord user =
+                                userDAO.authenticateByRoleAndPassword(
+                                        role,
+                                        password
+                                );
 
-                    JOptionPane.showMessageDialog(
-                            LoginFrame.this,
-                            "Invalid username or password"
-                    );
-                }
+                        if (user != null) {
+
+                            JOptionPane.showMessageDialog(
+                                    LoginFrame.this,
+                                    "Login successful as " + user.role
+                            );
+
+                            new DashboardFrame(
+                                    user.userId,
+                                    user.fullName,
+                                    user.role
+                            ).setVisible(true);
+
+                            LoginFrame.this.dispose();
+
+                        } else {
+
+                            JOptionPane.showMessageDialog(
+                                    LoginFrame.this,
+                                    "Invalid username or password."
+                            );
+                        }
+
+                    } catch (Exception ex) {
+
+                        JOptionPane.showMessageDialog(
+                                LoginFrame.this,
+                                "Login error: " + ex.getMessage()
+                        );
+                    }
+                });
             }
+
         });
     }
 }
