@@ -196,12 +196,16 @@ public class DashboardFrame extends JFrame {
 
             case "store keeper":
                 return menuName.equals("Suppliers")
-                        || menuName.equals("Inventory");
+                        || menuName.equals("Inventory")
+                        || menuName.equals("Customers")
+                        || menuName.equals("Cheques")
+                        || menuName.equals("Reports");
 
             case "cashier":
                 return menuName.equals("Sales")
                         || menuName.equals("Customers")
-                        || menuName.equals("Inventory");
+                        || menuName.equals("Inventory")
+                        || menuName.equals("Cheques");
 
             default:
                 return false;
