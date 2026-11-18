@@ -1,19 +1,21 @@
 package com.stockmanagement.inventory.dao;
 
 import com.stockmanagement.database.DatabaseConnection;
+import com.stockmanagement.inventory.model.Item;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ItemDAO {
 
-    // ------------------------------------------------------------------
+
     // Light-weight read models used by the POS screen (ui/sales/POSFrame)
-    // ------------------------------------------------------------------
 
     /** Customer shown in the POS drop-down. customerId == null means the Walk-in customer. */
     public static class CustomerSummary {
@@ -47,8 +49,7 @@ public class ItemDAO {
             return customerId == null ? customerName : customerName + " (" + customerType + ")";
         }
     }
-
-    /** Item + how many units can be sold right now (non-expired batches only). */
+    // Holds item details along with sellable (non-expired) stock count
     public static class ItemStockSummary {
         private final int itemId;
         private final String itemCode;
@@ -91,7 +92,7 @@ public class ItemDAO {
         }
     }
 
-    // SELECT shared by the two stock lookups below. Expired batches are NOT sellable.
+    // Base query to fetch item details and sum only non-expired batch quantities
     private static final String STOCK_SELECT =
             "SELECT i.item_id, i.item_code, i.barcode, i.item_name, i.base_unit_id, u.unit_name, " +
                     "       i.retail_price, i.wholesale_price, " +
@@ -112,8 +113,7 @@ public class ItemDAO {
         }
         return list;
     }
-
-    /** Matches item_code OR barcode. Returns null if no such item (stock may be 0). */
+    // Finds stock summary by exact item code or barcode
     public ItemStockSummary findStockByCodeOrBarcode(String codeOrBarcode) throws SQLException {
         String sql = STOCK_SELECT + "WHERE i.item_code = ? OR i.barcode = ?";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -241,5 +241,207 @@ public class ItemDAO {
         } catch (SQLException e) {
             System.err.println("Error listing low stock items: " + e.getMessage());
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Inventory screens: item master data (CRUD) + stock-aware lookups
+    // ------------------------------------------------------------------
+
+    // current_stock counts only NON-expired batches, same rule the POS uses.
+    private static final String ITEM_SELECT =
+            "SELECT i.item_id, i.item_code, i.barcode, i.item_name, i.category_id, c.category_name, " +
+                    "       i.base_unit_id, u.unit_name, i.reorder_level, i.retail_price, i.wholesale_price, " +
+                    "       COALESCE((SELECT SUM(b.quantity_remaining) FROM batches b " +
+                    "                  WHERE b.item_id = i.item_id AND b.quantity_remaining > 0 " +
+                    "                    AND b.expiry_date >= date('now','localtime')), 0) AS current_stock " +
+                    "FROM items i " +
+                    "JOIN categories c ON c.category_id = i.category_id " +
+                    "JOIN units u ON u.unit_id = i.base_unit_id ";
+    // Fetches all items, optionally filtered by code, name, or barcode
+    public List<Item> findAllItems(String search) throws SQLException {
+        boolean filter = search != null && !search.isBlank();
+        String sql = ITEM_SELECT +
+                (filter ? "WHERE i.item_code LIKE ? OR i.item_name LIKE ? OR i.barcode LIKE ? " : "") +
+                "ORDER BY i.item_name";
+        List<Item> list = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (filter) {
+                String like = "%" + search.trim() + "%";
+                ps.setString(1, like);
+                ps.setString(2, like);
+                ps.setString(3, like);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapItem(rs));
+                }
+            }
+        }
+        return list;
+    }
+
+    public Item findById(int itemId) throws SQLException {
+        String sql = ITEM_SELECT + "WHERE i.item_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, itemId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? mapItem(rs) : null;
+            }
+        }
+    }
+    // Finds an item by exact item code or barcode (used for barcode scanners)
+    public Item findByCodeOrBarcode(String codeOrBarcode) throws SQLException {
+        String sql = ITEM_SELECT + "WHERE i.item_code = ? OR i.barcode = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codeOrBarcode);
+            ps.setString(2, codeOrBarcode);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? mapItem(rs) : null;
+            }
+        }
+    }
+
+    // Fetches items with stock at or below reorder level, sorted lowest first
+    public List<Item> findLowStockItems() throws SQLException {
+        String sql = "SELECT * FROM (" + ITEM_SELECT + ") WHERE current_stock <= reorder_level " +
+                "ORDER BY current_stock ASC, item_name";
+        List<Item> list = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(mapItem(rs));
+            }
+        }
+        return list;
+    }
+
+    public boolean codeExists(String itemCode, int excludeItemId) throws SQLException {
+        return exists("SELECT 1 FROM items WHERE lower(item_code) = lower(?) AND item_id <> ?", itemCode, excludeItemId);
+    }
+
+    public boolean barcodeExists(String barcode, int excludeItemId) throws SQLException {
+        return exists("SELECT 1 FROM items WHERE barcode = ? AND item_id <> ?", barcode, excludeItemId);
+    }
+
+    private boolean exists(String sql, String value, int excludeItemId) throws SQLException {
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, value);
+            ps.setInt(2, excludeItemId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    // Inserts a new Item object and returns its generated ID
+    public int insertItem(Item item) throws SQLException {
+        String sql = "INSERT INTO items(item_code, barcode, item_name, category_id, base_unit_id, " +
+                "reorder_level, retail_price, wholesale_price) VALUES(?, ?, ?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            bindItem(ps, item);
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                return rs.next() ? rs.getInt(1) : -1;
+            }
+        }
+    }
+
+    public void updateItem(Item item) throws SQLException {
+        String sql = "UPDATE items SET item_code = ?, barcode = ?, item_name = ?, category_id = ?, base_unit_id = ?, " +
+                "reorder_level = ?, retail_price = ?, wholesale_price = ? WHERE item_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            bindItem(ps, item);
+            ps.setInt(9, item.getItemId());
+            ps.executeUpdate();
+        }
+    }
+
+    private void bindItem(PreparedStatement ps, Item item) throws SQLException {
+        ps.setString(1, item.getItemCode());
+        if (item.getBarcode() == null || item.getBarcode().isBlank()) {
+            ps.setNull(2, Types.VARCHAR);
+        } else {
+            ps.setString(2, item.getBarcode());
+        }
+        ps.setString(3, item.getItemName());
+        ps.setInt(4, item.getCategoryId());
+        ps.setInt(5, item.getBaseUnitId());
+        ps.setInt(6, item.getReorderLevel());
+        ps.setDouble(7, item.getRetailPrice());
+        ps.setDouble(8, item.getWholesalePrice());
+    }
+
+    // Checks if an item has any batches, stock movements, or sales history
+    public boolean hasStockHistory(int itemId) throws SQLException {
+        String sql = "SELECT (SELECT COUNT(*) FROM batches WHERE item_id = ?) " +
+                "+ (SELECT COUNT(*) FROM stock_movements WHERE item_id = ?) " +
+                "+ (SELECT COUNT(*) FROM invoice_items WHERE item_id = ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, itemId);
+            ps.setInt(2, itemId);
+            ps.setInt(3, itemId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
+// Safely deletes an item and its pricing/unit rules inside a transaction
+public void deleteItem(int itemId) throws SQLException {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                for (String table : new String[]{"bulk_discounts", "customer_pricing", "unit_conversions"}) {
+                    try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + table + " WHERE item_id = ?")) {
+                        ps.setInt(1, itemId);
+                        ps.executeUpdate();
+                    }
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM items WHERE item_id = ?")) {
+                    ps.setInt(1, itemId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
+        }
+    }
+
+    // Generates the next sequential item code (e.g., ITM-001, ITM-002)
+    public String nextItemCode() throws SQLException {
+        String sql = "SELECT COALESCE(MAX(CAST(SUBSTR(item_code, 5) AS INTEGER)), 0) FROM items WHERE item_code LIKE 'ITM-%'";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            int next = rs.next() ? rs.getInt(1) + 1 : 1;
+            return String.format("ITM-%03d", next);
+        }
+    }
+
+    private Item mapItem(ResultSet rs) throws SQLException {
+        Item i = new Item();
+        i.setItemId(rs.getInt("item_id"));
+        i.setItemCode(rs.getString("item_code"));
+        i.setBarcode(rs.getString("barcode"));
+        i.setItemName(rs.getString("item_name"));
+        i.setCategoryId(rs.getInt("category_id"));
+        i.setCategoryName(rs.getString("category_name"));
+        i.setBaseUnitId(rs.getInt("base_unit_id"));
+        i.setBaseUnitName(rs.getString("unit_name"));
+        i.setReorderLevel(rs.getInt("reorder_level"));
+        i.setRetailPrice(rs.getDouble("retail_price"));
+        i.setWholesalePrice(rs.getDouble("wholesale_price"));
+        i.setCurrentStock(rs.getInt("current_stock"));
+        return i;
     }
 }
