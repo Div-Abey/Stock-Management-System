@@ -76,9 +76,7 @@ public class InvoiceFrame extends JFrame {
         });
         topBar.add(btnReset);
 
-        JLabel hint = new JLabel("<html><i>Find an old invoice to view or re-print it. Use the invoice no. printed on the receipt "
-                + "(works for every customer) or a registered customer's name. Walk-in sales are all listed as "
-                + "\"Walk-in Customer\".</i></html>");
+        JLabel hint = new JLabel("<html><i>Find an old invoice to view or re-print it.");
         hint.setForeground(Color.DARK_GRAY);
         hint.setBorder(new EmptyBorder(0, 8, 4, 8));
 
@@ -136,8 +134,6 @@ public class InvoiceFrame extends JFrame {
         btnRefresh.addActionListener(e -> loadAllInvoices());
 
         JButton btnPrint = new JButton("Print Receipt");
-        btnPrint.setBackground(new Color(37, 99, 235));
-        btnPrint.setForeground(Color.WHITE);
         btnPrint.setFont(new Font("SansSerif", Font.BOLD, 13));
         btnPrint.addActionListener(e -> {
             if (printCurrentPreview() && closeAfterPrint) {
@@ -333,4 +329,4 @@ public class InvoiceFrame extends JFrame {
         sb.append("================================================\n");
         return sb.toString();
     }
-}
+}

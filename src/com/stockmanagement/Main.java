@@ -30,6 +30,7 @@ public class Main {
 
         itemDAO.addItem("ITM-001", "8901234567890", "Orange Juice 1L", 1, 1, 15, 350.00, 300.00);
         seedDemoStock();
+        seedDemoPartners();
 
         // Step 3: Check Stock Alerts
         itemDAO.listLowStockItems();
@@ -91,6 +92,30 @@ public class Main {
             }
         } catch (SQLException e) {
             System.err.println("Error seeding demo stock: " + e.getMessage());
+        }
+    }
+
+    /**
+     * TEMPORARY: so the Customers / Suppliers screens have something to show on a new database.
+     * Each insert only runs when its table is completely empty. Delete this method later.
+     */
+    private static void seedDemoPartners() {
+        String[] statements = {
+                "INSERT INTO customers(customer_name, phone, customer_type, credit_limit) " +
+                        "SELECT 'Kamal Stores', '0771234567', 'WHOLESALE', 50000 WHERE NOT EXISTS (SELECT 1 FROM customers) " +
+                        "UNION ALL " +
+                        "SELECT 'Nimal Perera', '0712345678', 'RETAIL', 5000 WHERE NOT EXISTS (SELECT 1 FROM customers)",
+                "INSERT INTO suppliers(supplier_name, phone, address) " +
+                        "SELECT 'Lanka Traders', '0112345678', 'Colombo 10' WHERE NOT EXISTS (SELECT 1 FROM suppliers)"
+        };
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            for (String sql : statements) {
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.executeUpdate();
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error seeding demo customers / suppliers: " + e.getMessage());
         }
     }
 }
