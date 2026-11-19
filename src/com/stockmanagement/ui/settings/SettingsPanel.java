@@ -2,9 +2,11 @@ package com.stockmanagement.ui.settings;
 
 import com.stockmanagement.security.dao.UserDAO;
 import com.stockmanagement.security.dao.UserDAO.UserRecord;
+import com.stockmanagement.settings.dao.SettingsDAO;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.SQLException;
 import java.util.List;
@@ -13,10 +15,15 @@ public class SettingsPanel extends JPanel {
 
     private final String currentRole;
     private final UserDAO userDAO = new UserDAO();
+    private final SettingsDAO settingsDAO = new SettingsDAO();
 
     private JComboBox<UserRecord> userComboBox;
     private JPasswordField newPasswordField;
     private JPasswordField confirmPasswordField;
+
+    private DefaultTableModel accountTableModel;
+    private JTable accountTable;
+    private JButton toggleStatusButton;
 
     public SettingsPanel(String currentRole) {
         this.currentRole = currentRole;
@@ -33,9 +40,17 @@ public class SettingsPanel extends JPanel {
 
         content.add(createPasswordPanel());
 
+        if ("Admin".equalsIgnoreCase(currentRole)) {
+            content.add(Box.createVerticalStrut(15));
+            content.add(createAccountStatusPanel());
+        }
+
         add(content, BorderLayout.CENTER);
 
         loadUsers();
+        if ("Admin".equalsIgnoreCase(currentRole)) {
+            loadAccountStatusTable();
+        }
     }
 
     // ---------------- Password Panel ----------------
@@ -88,6 +103,151 @@ public class SettingsPanel extends JPanel {
         updateButton.addActionListener(e -> updatePassword());
 
         return panel;
+    }
+
+    // ---------------- Account Enable / Disable Panel (Admin Only) ----------------
+
+    private JPanel createAccountStatusPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createTitledBorder("User Account Enable / Disable (Non-Admin)"));
+
+        String[] columns = {"User ID", "Username", "Full Name", "Role", "Status"};
+        accountTableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        accountTable = new JTable(accountTableModel);
+        accountTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        accountTable.getSelectionModel().addListSelectionListener(e -> updateToggleButtonText());
+
+        JScrollPane scrollPane = new JScrollPane(accountTable);
+        scrollPane.setPreferredSize(new Dimension(0, 180));
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        toggleStatusButton = new JButton("Enable / Disable Account");
+        toggleStatusButton.setEnabled(false);
+        toggleStatusButton.addActionListener(e -> toggleSelectedUserStatus());
+
+        JButton refreshButton = new JButton("Refresh");
+        refreshButton.addActionListener(e -> loadAccountStatusTable());
+
+        buttonPanel.add(refreshButton);
+        buttonPanel.add(toggleStatusButton);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void updateToggleButtonText() {
+        int selectedRow = accountTable.getSelectedRow();
+        if (selectedRow == -1) {
+            toggleStatusButton.setEnabled(false);
+            toggleStatusButton.setText("Enable / Disable Account");
+            return;
+        }
+
+        String currentStatus = String.valueOf(accountTableModel.getValueAt(selectedRow, 4));
+        toggleStatusButton.setEnabled(true);
+        if ("Disabled".equalsIgnoreCase(currentStatus)) {
+            toggleStatusButton.setText("Enable Account");
+        } else {
+            toggleStatusButton.setText("Disable Account");
+        }
+    }
+
+    private void loadAccountStatusTable() {
+        try {
+            accountTableModel.setRowCount(0);
+            List<Object[]> rows = settingsDAO.getNonAdminUsers();
+            for (Object[] row : rows) {
+                accountTableModel.addRow(row);
+            }
+            updateToggleButtonText();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Unable to load user accounts: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+    private void toggleSelectedUserStatus() {
+        if (!"Admin".equalsIgnoreCase(currentRole)) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Only Admin can enable or disable user accounts.",
+                    "Access Denied",
+                    JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+
+        int selectedRow = accountTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a user account first.");
+            return;
+        }
+
+        int userId = Integer.parseInt(String.valueOf(accountTableModel.getValueAt(selectedRow, 0)));
+        String username = String.valueOf(accountTableModel.getValueAt(selectedRow, 1));
+        String role = String.valueOf(accountTableModel.getValueAt(selectedRow, 3));
+        String currentStatus = String.valueOf(accountTableModel.getValueAt(selectedRow, 4));
+
+        if ("Admin".equalsIgnoreCase(role)) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Admin accounts cannot be disabled.",
+                    "Not Allowed",
+                    JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+
+        boolean enableAccount = "Disabled".equalsIgnoreCase(currentStatus);
+        String actionWord = enableAccount ? "enable" : "disable";
+
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to " + actionWord + " account '" + username + "' (" + role + ")?",
+                "Confirm Account Status Change",
+                JOptionPane.YES_NO_OPTION
+        );
+
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            boolean updated = settingsDAO.updateUserStatus(userId, enableAccount);
+            if (updated) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Account '" + username + "' has been " + (enableAccount ? "enabled." : "disabled.")
+                );
+                loadAccountStatusTable();
+                loadUsers();
+            } else {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Unable to update account status.",
+                        "Update Failed",
+                        JOptionPane.WARNING_MESSAGE
+                );
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to update account status: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
     }
 
     // ---------------- Load Users ----------------
