@@ -5,8 +5,6 @@ import com.stockmanagement.ui.dashboard.DashboardFrame;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 public class LoginFrame extends JFrame {
 
@@ -41,7 +39,7 @@ public class LoginFrame extends JFrame {
         Font labelFont = new Font("Arial", Font.PLAIN, 14);
         Font fieldFont = new Font("Arial", Font.PLAIN, 14);
 
-        // Username
+        // Role / Username
         JLabel usernameLabel = new JLabel("Username:");
         usernameLabel.setFont(labelFont);
 
@@ -97,63 +95,42 @@ public class LoginFrame extends JFrame {
 
         add(panel);
 
-        loginButton.addActionListener(new ActionListener() {
+        loginButton.addActionListener(e -> handleLogin());
+    }
 
-            @Override
-            public void actionPerformed(ActionEvent e) {
+    private void handleLogin() {
+        String role = (String) userRoleComboBox.getSelectedItem();
+        String password = new String(passwordField.getPassword());
 
-                // Login logic
-                loginButton.addActionListener(ea -> {
+        try {
+            UserDAO userDAO = new UserDAO();
+            UserDAO.UserRecord user = userDAO.authenticateByRoleAndPassword(role, password);
 
-                    String role = (String) userRoleComboBox.getSelectedItem();
+            if (user != null) {
+                JOptionPane.showMessageDialog(
+                        LoginFrame.this,
+                        "Login successful as " + user.role
+                );
 
-                    String password = new String(
-                            passwordField.getPassword()
-                    );
+                new DashboardFrame(
+                        user.userId,
+                        user.fullName,
+                        user.role
+                ).setVisible(true);
 
-                    try {
-
-                        UserDAO userDAO = new UserDAO();
-
-                        UserDAO.UserRecord user =
-                                userDAO.authenticateByRoleAndPassword(
-                                        role,
-                                        password
-                                );
-
-                        if (user != null) {
-
-                            JOptionPane.showMessageDialog(
-                                    LoginFrame.this,
-                                    "Login successful as " + user.role
-                            );
-
-                            new DashboardFrame(
-                                    user.userId,
-                                    user.fullName,
-                                    user.role
-                            ).setVisible(true);
-
-                            LoginFrame.this.dispose();
-
-                        } else {
-
-                            JOptionPane.showMessageDialog(
-                                    LoginFrame.this,
-                                    "Invalid username or password."
-                            );
-                        }
-
-                    } catch (Exception ex) {
-
-                        JOptionPane.showMessageDialog(
-                                LoginFrame.this,
-                                "Login error: " + ex.getMessage()
-                        );
-                    }
-                });
+                LoginFrame.this.dispose();
+            } else {
+                JOptionPane.showMessageDialog(
+                        LoginFrame.this,
+                        "Invalid username or password or account is disabled."
+                );
             }
 
-        });
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(
+                    LoginFrame.this,
+                    "Login error: " + ex.getMessage()
+            );
+        }
     }
 }
